@@ -158,3 +158,43 @@ final class DetailTests: XCTestCase {
         XCTAssertEqual(PostalAddress().singleLine, "")
     }
 }
+
+// MARK: - Phone matching
+
+/// The comparison that decides whether two written numbers are the same one.
+///
+/// Every case here is a shape a real number arrives in. The national-vs-
+/// international pair is the one that matters: the first version of this
+/// compared suffixes and got it wrong, so `--remove phone=07700900999`
+/// refused to remove `+447700900999`.
+final class PhoneMatchTests: XCTestCase {
+
+    func testTheSameNumberWrittenTwoWaysMatches() {
+        XCTAssertTrue(PhoneMatch.same("+44 7700 900123", "07700900123"))
+        XCTAssertTrue(PhoneMatch.same("+447700900123", "07700 900123"))
+        XCTAssertTrue(PhoneMatch.same("(020) 7946 0000", "+44 20 7946 0000"))
+        XCTAssertTrue(PhoneMatch.same("+1 (703) 944-5362", "7039445362"))
+    }
+
+    func testPunctuationAndSpacingAreIgnored() {
+        XCTAssertTrue(PhoneMatch.same("+44 7700 900123", "+44-7700-900123"))
+        XCTAssertTrue(PhoneMatch.same("07700 900 123", "07700900123"))
+    }
+
+    func testDifferentNumbersDoNotMatch() {
+        XCTAssertFalse(PhoneMatch.same("+447700900123", "+447700900124"))
+        XCTAssertFalse(PhoneMatch.same("02079460000", "02079460001"))
+    }
+
+    func testShortNumbersOnlyMatchExactly() {
+        // A shared tail between short codes is a coincidence, not a match.
+        XCTAssertTrue(PhoneMatch.same("101", "101"))
+        XCTAssertFalse(PhoneMatch.same("101", "8101"))
+        XCTAssertFalse(PhoneMatch.same("900123", "44900123"))
+    }
+
+    func testTextWithNoDigitsNeverMatches() {
+        XCTAssertFalse(PhoneMatch.same("", "07700900123"))
+        XCTAssertFalse(PhoneMatch.same("not a number", "07700900123"))
+    }
+}

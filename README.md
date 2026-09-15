@@ -108,11 +108,34 @@ building a fresh `CNMutableContact` to change a job title blanks the phone
 numbers. Updates here re-fetch and edit in place — asserted by a test that
 changes one field and checks the others survive.
 
-**Phone matching is less forgiving than it looks.** Measured: the number as
-stored matches, spaces removed matches, **digits only does not**, and a
-trailing fragment does not. Dropping a `+` changes the number as far as the
-store is concerned. There is a Swift-side fallback for the looser case, tried
-only when the store's own predicate finds nothing.
+**Phone matching is less forgiving than it looks.** Measured against the
+store's own predicate: the number as stored matches, spaces removed matches,
+**digits only does not**, and a trailing fragment does not. Dropping a `+`
+changes the number as far as the store is concerned. So there is a Swift-side
+fallback, tried only when the predicate finds nothing — and the comparison in
+it is `PhoneMatch`, which is **not** "does one end with the other". That test
+fails on the commonest pair there is:
+
+```
+  447700900123   stored, digits only
+  07700900123    typed, digits only
+```
+
+The national trunk `0` *replaces* the country code rather than sitting beside
+it, so neither string is a suffix of the other. `PhoneMatch` compares the last
+nine digits, which gets it right, with a floor of seven below which only an
+exact match counts — shorter than that and a shared tail is a coincidence.
+
+**`CNSaveRequest.removeMember` does nothing.** macOS 27, iCloud account: the
+request executes without throwing and the membership survives — in the store's
+own predicate, in a fresh process, and in the address book's SQLite file. Every
+variant fails identically: the unified contact, the contact as the group
+returned it, the non-unified record, a mutable copy of the group, and a contact
+added and removed inside one session. `addMember` works. So both membership
+calls verify their result and throw rather than reporting a success that did
+not happen, and a caller that must remove a member can do it through
+Contacts.app, whose AppleScript `remove` does work — which is what the
+`contacts` CLI falls back to.
 
 **Labels arrive three ways.** `_$!<Mobile>!$_` is the framework's spelling and
 its delimiters cannot be trimmed — a contact saved with plain `Mobile` loses

@@ -58,7 +58,8 @@ public extension ContactStore {
     /// |---|---|
     /// | exactly as stored | yes |
     /// | spaces removed | yes |
-    /// | digits only | no |
+    /// | digits only | yes, via the fallback below |
+    /// | nationally, when stored internationally | yes, via the fallback below |
     /// | last seven digits | no |
     ///
     /// A caller wanting looser matching should read the numbers and compare
@@ -91,21 +92,16 @@ public extension ContactStore {
         phone: String,
         fields: [ContactField]
     ) throws -> [Person] {
-        let wanted = phone.filter(\.isNumber)
         // Seven is the length of a local subscriber number in most plans:
         // shorter than that and a "match" is a coincidence.
-        guard wanted.count >= 7 else { return [] }
+        guard PhoneMatch.digits(phone).count >= PhoneMatch.minimumDigits else { return [] }
 
         var wantedFields = fields
         if !wantedFields.contains(.phoneNumbers) { wantedFields.append(.phoneNumbers) }
 
         var found: [Person] = []
         try enumerate(fields: wantedFields) { person in
-            let matches = person.phoneNumbers.contains { number in
-                let stored = number.value.filter(\.isNumber)
-                guard stored.count >= 7 else { return false }
-                return stored.hasSuffix(wanted) || wanted.hasSuffix(stored)
-            }
+            let matches = person.phoneNumbers.contains { PhoneMatch.same($0.value, phone) }
             if matches { found.append(person) }
         }
         return found

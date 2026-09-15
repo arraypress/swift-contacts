@@ -234,7 +234,36 @@ public enum ContactField: String, Sendable, CaseIterable, Codable, Hashable {
         "image": .imageData,
         "id": .identifier,
         "type": .contactType,
-        "notes": .note
+        "kind": .contactType,
+        "notes": .note,
+
+        // Singulars. Every repeating field is named in the plural by the
+        // framework and typed in the singular by people — `--add date=…`
+        // reads better than `--add dates=…`, and a vocabulary that refuses
+        // the natural spelling is a vocabulary people have to look up.
+        "date": .dates,
+        "relation": .relations,
+        "related": .relations,
+        "profile": .socialProfiles,
+        "profiles": .socialProfiles,
+        "socials": .socialProfiles,
+        "ims": .instantMessageAddresses,
+        "chat": .instantMessageAddresses,
+        "instantmessage": .instantMessageAddresses,
+        "messaging": .instantMessageAddresses,
+
+        // The rest of the card, under the words people use for it.
+        "nick": .nickname,
+        "prefix": .namePrefix,
+        "suffix": .nameSuffix,
+        "maiden": .previousFamilyName,
+        "maidenname": .previousFamilyName,
+        "job": .jobTitle,
+        "department": .departmentName,
+        "dept": .departmentName,
+        "birthdate": .birthday,
+        "thumbnail": .thumbnailImageData,
+        "hasphoto": .imageDataAvailable
     ]
 
     static func normalise(_ token: String) -> String {

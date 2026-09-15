@@ -145,21 +145,60 @@ public extension ContactStore {
     }
 
     /// Puts a contact in a group.
+    ///
+    /// Verified afterwards — see ``removeMember(contact:fromGroup:)`` for why
+    /// a membership change cannot be trusted to have happened just because the
+    /// store accepted it.
     func addMember(contact id: String, toGroup group: String) throws {
         try ensureAccess()
         let (contact, target) = try memberPair(contact: id, group: group)
         let request = CNSaveRequest()
         request.addMember(contact, to: target)
         try executeSave(request)
+
+        guard try isMember(id, ofGroup: group) else {
+            throw ContactsError.writeFailed(
+                "Contacts accepted the change and did not make it — \(id) is still outside that group"
+            )
+        }
     }
 
     /// Takes a contact out of a group, leaving the contact alone.
+    ///
+    /// - Important: **`CNSaveRequest.removeMember` does nothing on macOS 27
+    ///   against an iCloud account.** Measured, not inferred: the request
+    ///   executes without throwing, and the membership survives — in the
+    ///   store's own predicate, in a fresh process, and in the address book's
+    ///   SQLite file. Every variant fails the same way: the unified contact,
+    ///   the contact as the group returned it, the non-unified record, a
+    ///   mutable copy of the group, and a contact added and removed in one
+    ///   session.
+    ///
+    ///   So this verifies the result and throws rather than reporting a
+    ///   success that did not happen. A caller that must remove a member can
+    ///   do it through Contacts.app, whose AppleScript `remove` works — the
+    ///   `contacts` CLI falls back to exactly that.
     func removeMember(contact id: String, fromGroup group: String) throws {
         try ensureAccess()
         let (contact, target) = try memberPair(contact: id, group: group)
         let request = CNSaveRequest()
         request.removeMember(contact, from: target)
         try executeSave(request)
+
+        guard try !isMember(id, ofGroup: group) else {
+            throw ContactsError.writeFailed(
+                "Contacts accepted the change and did not make it — \(id) is still in that group"
+            )
+        }
+    }
+
+    /// Whether a contact is in a group, asked fresh.
+    private func isMember(_ id: String, ofGroup group: String) throws -> Bool {
+        let members = try rawStore.unifiedContacts(
+            matching: CNContact.predicateForContactsInGroup(withIdentifier: group),
+            keysToFetch: [CNContactIdentifierKey as CNKeyDescriptor]
+        )
+        return members.contains { $0.identifier == id }
     }
 
     // MARK: - Internals
